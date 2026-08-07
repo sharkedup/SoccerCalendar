@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Soccer Calendar Checker</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+           background: #f5f5f7; color: #1d1d1f; min-height: 100vh; }
+    nav  { background: #1d1d1f; padding: 0 2rem; display: flex; align-items: center;
+           gap: 2rem; height: 52px; }
+    nav a { color: #f5f5f7; text-decoration: none; font-size: .9rem; opacity: .8; }
+    nav a:first-child { font-weight: 600; font-size: 1rem; opacity: 1; flex: 1; }
+    nav a:hover { opacity: 1; }
+    .container { max-width: 960px; margin: 0 auto; padding: 2rem 1.5rem; }
+    h1  { font-size: 1.6rem; font-weight: 600; margin-bottom: 1.5rem; }
+    h2  { font-size: 1.1rem; font-weight: 600; margin-bottom: 1rem; color: #444; }
+    .card { background: #fff; border-radius: 12px; padding: 1.5rem;
+            box-shadow: 0 1px 4px rgba(0,0,0,.08); margin-bottom: 1.5rem; }
+    .badge { display: inline-block; padding: .25rem .65rem; border-radius: 20px;
+             font-size: .8rem; font-weight: 600; }
+    .badge-ok      { background: #d1fae5; color: #065f46; }
+    .badge-issues  { background: #fee2e2; color: #991b1b; }
+    .badge-error   { background: #fef3c7; color: #92400e; }
+    .badge-mismatch    { background: #fee2e2; color: #991b1b; }
+    .badge-missing     { background: #fef3c7; color: #92400e; }
+    table { width: 100%; border-collapse: collapse; font-size: .9rem; }
+    th    { text-align: left; padding: .6rem .75rem; border-bottom: 2px solid #e5e5e5;
+            font-weight: 600; color: #555; font-size: .8rem; text-transform: uppercase;
+            letter-spacing: .05em; }
+    td    { padding: .6rem .75rem; border-bottom: 1px solid #f0f0f0; vertical-align: top; }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: #fafafa; }
+    .btn { display: inline-block; padding: .5rem 1.2rem; border-radius: 8px; border: none;
+           cursor: pointer; font-size: .9rem; font-weight: 500; text-decoration: none; }
+    .btn-primary { background: #0071e3; color: #fff; }
+    .btn-primary:hover { background: #0077ed; }
+    .btn-secondary { background: #e5e5e5; color: #1d1d1f; }
+    .btn-secondary:hover { background: #d5d5d5; }
+    .flash { padding: .75rem 1rem; border-radius: 8px; margin-bottom: 1.5rem;
+             background: #d1fae5; color: #065f46; font-size: .9rem; }
+    .meta  { font-size: .8rem; color: #888; }
+    label  { display: block; font-size: .9rem; font-weight: 500; margin-bottom: .35rem; color: #333; }
+    input[type=text], input[type=email], input[type=password], input[type=time], select {
+      width: 100%; padding: .5rem .75rem; border: 1px solid #d5d5d5;
+      border-radius: 8px; font-size: .95rem; outline: none; }
+    input:focus { border-color: #0071e3; box-shadow: 0 0 0 3px rgba(0,113,227,.15); }
+    .form-row { margin-bottom: 1.2rem; }
+    .form-hint { font-size: .8rem; color: #888; margin-top: .3rem; }
+    .section-divider { border: none; border-top: 1px solid #e5e5e5; margin: 1.5rem 0; }
+  </style>
+</head>
+<body>
+<nav>
+  <a href="/">⚽ Soccer Calendar Checker</a>
+  <a href="/">Dashboard</a>
+  <a href="/config">Settings</a>
+</nav>
+<div class="container">
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% for category, message in messages %}
+      <div class="flash">{{ message }}</div>
+    {% endfor %}
+  {% endwith %}
+  {% block content %}{% endblock %}
+</div>
+</body>
+</html>

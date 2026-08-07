@@ -1,0 +1,17 @@
+{
+  "calendars": {
+    "primary": "U13G Phoenix",
+    "secondary": "SPF Phoenix"
+  },
+  "email": {
+    "address": "you@gmail.com",
+    "gmail_app_password": "xxxx xxxx xxxx xxxx",
+    "always_send": true
+  },
+  "schedule": {
+    "check_time": "07:00"
+  },
+  "web": {
+    "port": 8080
+  }
+}

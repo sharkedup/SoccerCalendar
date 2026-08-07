@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Settings</h1>
+
+<form method="post" action="/config">
+  <div class="card">
+    <h2>Calendars</h2>
+    <div class="form-row">
+      <label>Primary Calendar</label>
+      <input type="text" name="primary_cal" value="{{ config.calendars.primary }}" required>
+      <p class="form-hint">The main team calendar (e.g. U13G Phoenix)</p>
+    </div>
+    <div class="form-row">
+      <label>Secondary Calendar</label>
+      <input type="text" name="secondary_cal" value="{{ config.calendars.secondary }}" required>
+      <p class="form-hint">The league or second calendar to match against (e.g. SPF Phoenix)</p>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Email</h2>
+    <div class="form-row">
+      <label>Gmail Address</label>
+      <input type="email" name="email_address" value="{{ config.email.address }}">
+    </div>
+    <div class="form-row">
+      <label>Gmail App Password</label>
+      <input type="password" name="gmail_app_password" placeholder="Leave blank to keep existing password">
+      <p class="form-hint">Generate at <a href="https://myaccount.google.com/apppasswords" target="_blank">myaccount.google.com/apppasswords</a></p>
+    </div>
+    <div class="form-row">
+      <label style="display:flex; align-items:center; gap:.5rem; font-weight:400;">
+        <input type="checkbox" name="always_send" {% if config.email.always_send %}checked{% endif %}
+               style="width:auto; margin:0;">
+        Send daily email even when all games match
+      </label>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Schedule</h2>
+    <div class="form-row">
+      <label>Daily Check Time</label>
+      <input type="time" name="check_time" value="{{ config.schedule.check_time }}" style="width:auto;">
+    </div>
+  </div>
+
+  <button class="btn btn-primary" type="submit">Save Settings</button>
+  <a href="/" class="btn btn-secondary" style="margin-left:.5rem;">Cancel</a>
+</form>
+{% endblock %}

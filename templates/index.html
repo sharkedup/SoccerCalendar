@@ -1,0 +1,129 @@
+{% extends "base.html" %}
+{% block content %}
+<div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:1.5rem;">
+  <h1 style="margin:0">Dashboard</h1>
+  <form method="post" action="/run">
+    <button class="btn btn-primary" type="submit">Run Check Now</button>
+  </form>
+</div>
+
+{% if latest %}
+<div class="card">
+  <div style="display:flex; align-items:center; gap:.75rem; margin-bottom:.5rem;">
+    {% if latest.status == "ok" %}
+      <span class="badge badge-ok">All Clear</span>
+    {% elif latest.status == "issues" %}
+      <span class="badge badge-issues">Issues Found</span>
+    {% else %}
+      <span class="badge badge-error">Error</span>
+    {% endif %}
+    <span class="meta">Last checked {{ latest.timestamp | replace("T"," ") | truncate(16, False, "") }}</span>
+  </div>
+
+  {% if latest.status == "error" %}
+    <p style="color:#991b1b; margin-top:.5rem;">{{ latest.error }}</p>
+  {% elif latest.status == "ok" %}
+    <p style="color:#065f46; margin-top:.5rem;">
+      All upcoming games on <strong>{{ config.calendars.primary }}</strong> and
+      <strong>{{ config.calendars.secondary }}</strong> are consistent.
+    </p>
+  {% else %}
+    {% set issues = latest.games | selectattr("status", "ne", "ok") | list %}
+    <p style="color:#991b1b; margin-top:.5rem;">
+      {{ issues | length }} issue(s) found — check the game list below.
+    </p>
+  {% endif %}
+</div>
+
+{% if latest.games %}
+<div class="card">
+  <h2>Upcoming Games</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>Date</th>
+        <th>Time</th>
+        <th>{{ config.calendars.primary }}</th>
+        <th>{{ config.calendars.secondary }}</th>
+        <th>Status</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for game in latest.games %}
+      <tr>
+        <td>{{ game.date }}</td>
+        <td>{{ game.time }}</td>
+        <td>
+          {% if game.primary %}
+            <div>{{ game.primary.name }}</div>
+            <div class="meta">{{ game.primary.location or "No location" }}</div>
+          {% else %}
+            <span class="meta">—</span>
+          {% endif %}
+        </td>
+        <td>
+          {% if game.secondary %}
+            <div>{{ game.secondary.name }}</div>
+            <div class="meta">{{ game.secondary.location or "No location" }}</div>
+          {% else %}
+            <span class="meta">—</span>
+          {% endif %}
+        </td>
+        <td>
+          {% if game.status == "ok" %}
+            <span class="badge badge-ok">Match</span>
+          {% elif game.status == "location_mismatch" %}
+            <span class="badge badge-mismatch">Location Mismatch</span>
+          {% elif game.status == "missing_secondary" %}
+            <span class="badge badge-missing">Missing from {{ config.calendars.secondary }}</span>
+          {% elif game.status == "missing_primary" %}
+            <span class="badge badge-missing">Missing from {{ config.calendars.primary }}</span>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+
+{% else %}
+<div class="card">
+  <p style="color:#888;">No checks have been run yet. Click <strong>Run Check Now</strong> to get started.</p>
+</div>
+{% endif %}
+
+{% if history | length > 1 %}
+<div class="card">
+  <h2>Recent History</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>Timestamp</th>
+        <th>Status</th>
+        <th>Games</th>
+        <th>Issues</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for entry in history %}
+      <tr>
+        <td>{{ entry.timestamp | replace("T"," ") | truncate(16, False, "") }}</td>
+        <td>
+          {% if entry.status == "ok" %}
+            <span class="badge badge-ok">All Clear</span>
+          {% elif entry.status == "issues" %}
+            <span class="badge badge-issues">Issues</span>
+          {% else %}
+            <span class="badge badge-error">Error</span>
+          {% endif %}
+        </td>
+        <td>{{ entry.games | length }}</td>
+        <td>{{ entry.games | selectattr("status", "ne", "ok") | list | length }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+{% endblock %}
