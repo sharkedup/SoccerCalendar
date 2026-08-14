@@ -2,45 +2,59 @@ from __future__ import annotations
 
 import re
 import ssl
+import time
 import smtplib
-import subprocess
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 
-APPLESCRIPT = """\
-tell application "Calendar"
-    set output to ""
-    set theCalendar to first calendar whose name is "{CAL}"
-    set todayDate to current date
-    set time of todayDate to 0
-    set upcomingEvents to every event of theCalendar whose start date >= todayDate
-    repeat with e in upcomingEvents
-        set eName to summary of e
-        set eStart to start date of e
-        set eLoc to ""
-        try
-            set eLoc to location of e
-        end try
-        set yr  to year of eStart as string
-        set mo  to month of eStart as integer
-        set dy  to day of eStart
-        set hr  to hours of eStart
-        set mi  to minutes of eStart
-        set moStr to mo as string
-        set dyStr to dy as string
-        set hrStr to hr as string
-        set miStr to mi as string
-        if mo < 10 then set moStr to "0" & moStr
-        if dy < 10 then set dyStr to "0" & dyStr
-        if hr < 10 then set hrStr to "0" & hrStr
-        if mi < 10 then set miStr to "0" & miStr
-        set datePart to yr & "-" & moStr & "-" & dyStr & " " & hrStr & ":" & miStr
-        set output to output & eName & (ASCII character 9) & datePart & (ASCII character 9) & eLoc & (ASCII character 10)
-    end repeat
-    return output
-end tell
-"""
+import EventKit
+from Foundation import NSDate
+
+_store = EventKit.EKEventStore.alloc().init()
+
+
+def _ensure_calendar_access():
+    status = EventKit.EKEventStore.authorizationStatusForEntityType_(EventKit.EKEntityTypeEvent)
+    if status == EventKit.EKAuthorizationStatusFullAccess:
+        return
+
+    granted = [False]
+    responded = [False]
+
+    def completion_handler(success, error):
+        granted[0] = success
+        responded[0] = True
+
+    # macOS 14+ splits calendar access into full vs. write-only; the older
+    # requestAccessToEntityType:completion: only ever grants write-only here,
+    # so full read access requires the newer full-access request explicitly.
+    if hasattr(_store, "requestFullAccessToEventsWithCompletion_"):
+        _store.requestFullAccessToEventsWithCompletion_(completion_handler)
+    else:
+        _store.requestAccessToEntityType_completion_(EventKit.EKEntityTypeEvent, completion_handler)
+
+    for _ in range(300):  # wait up to 30s for the user to respond to the system prompt
+        if responded[0]:
+            break
+        time.sleep(0.1)
+
+    if not granted[0]:
+        raise PermissionError(
+            "Calendar access not granted. Please allow access in "
+            "System Settings > Privacy & Security > Calendars"
+        )
+
+
+def _find_calendar(calendar_name: str):
+    calendars = _store.calendarsForEntityType_(EventKit.EKEntityTypeEvent)
+    for cal in calendars:
+        if cal.title().lower() == calendar_name.lower():
+            return cal
+
+    available = ", ".join(cal.title() for cal in calendars)
+    raise RuntimeError(f"Could not read '{calendar_name}': calendar not found. Available: {available}")
+
 
 _STREET_SUFFIX = re.compile(
     r"\b(rd|road|ave|avenue|st|street|blvd|boulevard|dr|drive|ln|lane|ct|court|way|pl|place)\b",
@@ -49,30 +63,27 @@ _STREET_SUFFIX = re.compile(
 _STATE = re.compile(r"\bNJ\b|\bNew Jersey\b", re.IGNORECASE)
 
 
-def get_events(calendar_name: str) -> list[dict]:
-    script = APPLESCRIPT.replace("{CAL}", calendar_name)
-    result = subprocess.run(["osascript", "-e", script], capture_output=True, text=True)
-    if result.returncode != 0:
-        raise RuntimeError(f"Could not read '{calendar_name}': {result.stderr.strip()}")
+def get_events(calendar_name: str, months_ahead: int = 6) -> list[dict]:
+    _ensure_calendar_access()
+    calendar = _find_calendar(calendar_name)
+
+    today_start = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+    end = today_start + timedelta(days=30 * months_ahead)
+
+    ns_start = NSDate.dateWithTimeIntervalSince1970_(today_start.timestamp())
+    ns_end   = NSDate.dateWithTimeIntervalSince1970_(end.timestamp())
+
+    predicate  = _store.predicateForEventsWithStartDate_endDate_calendars_(ns_start, ns_end, [calendar])
+    ek_events  = _store.eventsMatchingPredicate_(predicate)
 
     events = []
-    for line in result.stdout.strip().splitlines():
-        if not line.strip():
-            continue
-        parts = line.split("\t")
-        if len(parts) < 2:
-            continue
-        name     = parts[0].strip()
-        start_s  = parts[1].strip()
-        location = parts[2].strip() if len(parts) > 2 else ""
-
+    for e in ek_events:
+        name = (e.title() or "").strip()
         if "practice" in name.lower():
             continue
 
-        try:
-            start_dt = datetime.strptime(start_s, "%Y-%m-%d %H:%M")
-        except ValueError:
-            continue
+        start_dt = datetime.fromtimestamp(e.startDate().timeIntervalSince1970())
+        location = (e.location() or "").strip()
 
         events.append({"name": name, "start": start_dt, "location": location})
 
@@ -116,7 +127,7 @@ def run_check(config: dict) -> dict:
     try:
         primary   = get_events(primary_cal)
         secondary = get_events(secondary_cal)
-    except RuntimeError as e:
+    except (RuntimeError, PermissionError) as e:
         return {
             "timestamp": datetime.now().isoformat(),
             "status": "error",
