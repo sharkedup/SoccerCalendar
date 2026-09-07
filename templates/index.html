@@ -1,172 +1,216 @@
 {% extends "base.html" %}
+
+{% set pri = latest.primary_label if latest and latest.primary_label else config.calendars.primary.label %}
+{% set sec = latest.secondary_label if latest and latest.secondary_label else config.calendars.secondary.label %}
+{% set issues = (latest.games | selectattr("status", "ne", "ok") | rejectattr("status", "eq", "cancelled") | list) if latest and latest.games else [] %}
+
+{% macro when(date, time) -%}
+  {{ date }}{% if time and time != "00:00" %} · {{ time }}{% else %} · time TBD{% endif %}
+{%- endmacro %}
+
 {% block content %}
-<div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:1.5rem;">
-  <h1 style="margin:0">Dashboard</h1>
-  <form method="post" action="/run">
-    <button class="btn btn-primary" type="submit">Run Check Now</button>
+<style>
+  .head { display:flex; align-items:center; justify-content:space-between; gap:1rem; margin-bottom:1rem; }
+  .head form { margin:0; }
+  .status-strip { border-radius:14px; padding:1rem 1.1rem; margin-bottom:1rem; font-weight:600; }
+  .strip-ok    { background:var(--ok-bg);   color:var(--ok-text); }
+  .strip-bad   { background:var(--bad-bg);  color:var(--bad-text); }
+  .strip-warn  { background:var(--warn-bg); color:var(--warn-text); }
+  .strip-note  { font-weight:450; font-size:.85rem; margin-top:.35rem; opacity:.9; }
+  .issue { border-left:4px solid var(--bad-text); background:var(--surface);
+           border-radius:10px; padding:.8rem .9rem; margin-bottom:.6rem; box-shadow:var(--shadow); }
+  .issue-top { display:flex; flex-wrap:wrap; align-items:center; gap:.5rem; margin-bottom:.35rem; }
+  .issue-when { font-weight:650; font-size:.95rem; }
+  .issue-name { font-size:.9rem; margin-bottom:.3rem; }
+  .side { font-size:.82rem; color:var(--text-dim); display:flex; gap:.4rem; padding:.1rem 0; }
+  .side b { color:var(--text); font-weight:600; min-width:0; }
+  .next-grid { display:grid; grid-template-columns:1fr 1fr; gap:1rem; margin-bottom:1rem; }
+  .next-card { background:var(--surface); border-radius:14px; padding:1.1rem; box-shadow:var(--shadow); }
+  .next-label { font-size:.72rem; text-transform:uppercase; letter-spacing:.06em;
+                color:var(--text-dim); font-weight:650; margin-bottom:.5rem; }
+  .next-when { font-size:1.15rem; font-weight:680; letter-spacing:-.01em; }
+  .next-name { font-size:.92rem; margin:.3rem 0 .35rem; }
+  .next-loc  { font-size:.82rem; color:var(--text-dim); overflow-wrap:anywhere; }
+  .sched-row { display:grid; grid-template-columns:8.5rem 1fr auto; gap:.75rem;
+               padding:.65rem .1rem; border-bottom:1px solid var(--line-soft); align-items:start; }
+  .sched-row:last-child { border-bottom:none; }
+  details summary { cursor:pointer; font-size:.85rem; color:var(--text-dim); }
+  @media (max-width: 640px) {
+    .head { flex-direction:column; align-items:stretch; }
+    .next-grid { grid-template-columns:1fr; gap:.7rem; }
+    .sched-row { grid-template-columns:1fr; gap:.2rem; }
+    .sched-row .badge { justify-self:start; margin-top:.2rem; }
+  }
+</style>
+
+<div class="head">
+  <div>
+    <h1>Dashboard</h1>
+    {% if latest %}<div class="meta">Checked {{ latest.timestamp | replace("T", " ") | truncate(16, True, "") }}</div>{% endif %}
+  </div>
+  <form method="post" action="/refresh">
+    <button class="btn btn-primary" type="submit">Refresh</button>
   </form>
 </div>
 
-{% if latest %}
-<div class="card">
-  <div style="display:flex; align-items:center; gap:.75rem; margin-bottom:.5rem;">
-    {% if latest.status == "ok" %}
-      <span class="badge badge-ok">All Clear</span>
-    {% elif latest.status == "issues" %}
-      <span class="badge badge-issues">Issues Found</span>
-    {% elif latest.status == "one_sided" %}
-      <span class="badge badge-issues">Games On One Feed Only</span>
-    {% elif latest.status == "no_games" %}
-      <span class="badge badge-issues">No Games — Nothing Compared</span>
-    {% else %}
-      <span class="badge badge-error">Error</span>
-    {% endif %}
-    <span class="meta">Last checked {{ latest.timestamp | replace("T"," ") | truncate(16, False, "") }}</span>
+{% if not latest %}
+  <div class="card"><p class="meta">No check has run yet. Tap <strong>Refresh</strong>.</p></div>
+{% else %}
+
+{# ── 1. Problems, at the top ────────────────────────────────────────────── #}
+{% if latest.status == "error" %}
+  <div class="status-strip strip-bad">
+    Check failed
+    <div class="strip-note">{{ latest.error }}</div>
+  </div>
+{% elif latest.status == "no_games" %}
+  <div class="status-strip strip-warn">
+    No games on either feed — nothing was compared
+    <div class="strip-note">This is not an all-clear. Neither {{ pri }} nor {{ sec }} has games in the next 6 months.</div>
+  </div>
+{% elif issues %}
+  <div class="status-strip strip-bad">
+    {{ issues | length }} game{{ "s" if issues | length != 1 else "" }} need{{ "" if issues | length != 1 else "s" }} attention
+    {% if latest.status == "one_sided" %}<div class="strip-note">{{ latest.error }}</div>{% endif %}
   </div>
 
-  {% if latest.status == "error" %}
-    <p style="color:#991b1b; margin-top:.5rem;">{{ latest.error }}</p>
-  {% elif latest.status in ("one_sided", "no_games") %}
-    <p style="color:#92400e; margin-top:.5rem;">
-      {{ latest.error or "Neither feed has any games in the next 6 months." }}
-      This is <strong>not</strong> an all-clear — nothing was cross-checked.
-    </p>
-  {% elif latest.status == "ok" %}
-    <p style="color:#065f46; margin-top:.5rem;">
-      All upcoming games on <strong>{{ latest.primary_label or config.calendars.primary.label }}</strong> and
-      <strong>{{ latest.secondary_label or config.calendars.secondary.label }}</strong> are consistent.
-    </p>
-  {% else %}
-    {% set issues = latest.games | selectattr("status", "ne", "ok") | list %}
-    <p style="color:#991b1b; margin-top:.5rem;">
-      {{ issues | length }} issue(s) found — check the game list below.
-    </p>
-  {% endif %}
+  {% for g in issues %}
+  <div class="issue">
+    <div class="issue-top">
+      <span class="issue-when">{{ when(g.date, g.time) }}</span>
+      {% if g.status == "missing_primary" %}<span class="badge badge-missing">Not on {{ pri }}</span>
+      {% elif g.status == "missing_secondary" %}<span class="badge badge-missing">Not on {{ sec }}</span>
+      {% elif g.status == "time_mismatch" %}<span class="badge badge-mismatch">Times disagree</span>
+      {% elif g.status == "location_mismatch" %}<span class="badge badge-mismatch">Locations disagree</span>
+      {% elif g.status == "tbd" %}<span class="badge badge-error">TBD</span>
+      {% endif %}
+    </div>
+    <div class="issue-name">{{ (g.primary or g.secondary).name }}</div>
+    {% if g.status == "time_mismatch" %}
+      <div class="side"><b>{{ pri }}</b> {{ g.primary.time }} · {{ g.primary.location or "no location" }}</div>
+      <div class="side"><b>{{ sec }}</b> {{ g.secondary.time }} · {{ g.secondary.location or "no location" }}</div>
+    {% elif g.status == "location_mismatch" %}
+      <div class="side"><b>{{ pri }}</b> {{ g.primary.location or "no location" }}</div>
+      <div class="side"><b>{{ sec }}</b> {{ g.secondary.location or "no location" }}</div>
+    {% else %}
+      {% set only = g.primary or g.secondary %}
+      <div class="side">{{ only.location or "no location" }}</div>
+    {% endif %}
+  </div>
+  {% endfor %}
+{% else %}
+  <div class="status-strip strip-ok">
+    All {{ latest.games | length }} game{{ "s" if latest.games | length != 1 else "" }} match
+    <div class="strip-note">{{ pri }} and {{ sec }} agree on every upcoming game.</div>
+  </div>
+{% endif %}
+
+{# ── 2. What's next ─────────────────────────────────────────────────────── #}
+<div class="next-grid">
+  <div class="next-card">
+    <div class="next-label">Next game</div>
+    {% if latest.next_game %}
+      <div class="next-when">{{ when(latest.next_game.date, latest.next_game.time) }}</div>
+      <div class="next-name">{{ latest.next_game.name }}</div>
+      <div class="next-loc">{{ latest.next_game.location or "Location TBD" }}</div>
+      {% if latest.next_game.status != "ok" %}
+        <div style="margin-top:.55rem;"><span class="badge badge-missing">Unconfirmed — see above</span></div>
+      {% endif %}
+    {% else %}
+      <div class="next-when" style="color:var(--text-dim);">None scheduled</div>
+      <div class="next-loc">No upcoming games on either feed.</div>
+    {% endif %}
+  </div>
+
+  <div class="next-card">
+    <div class="next-label">Next practice</div>
+    {% if latest.next_practice %}
+      <div class="next-when">{{ when(latest.next_practice.date, latest.next_practice.time) }}</div>
+      <div class="next-name">{{ latest.next_practice.name }}</div>
+      <div class="next-loc">{{ latest.next_practice.location or "Location TBD" }}</div>
+    {% else %}
+      <div class="next-when" style="color:var(--text-dim);">None scheduled</div>
+      <div class="next-loc">No upcoming practices on either feed.</div>
+    {% endif %}
+  </div>
 </div>
+
+{# ── 3. Everything else ─────────────────────────────────────────────────── #}
+{% if latest.games %}
+<div class="card">
+  <details {% if not issues %}open{% endif %}>
+    <summary>All upcoming games ({{ latest.games | length }})</summary>
+    <div style="margin-top:.75rem;">
+  {% for g in latest.games %}
+  <div class="sched-row">
+    <div><strong style="font-size:.9rem;">{{ g.date }}</strong>
+         <div class="meta">{% if g.time != "00:00" %}{{ g.time }}{% else %}time TBD{% endif %}</div></div>
+    <div style="min-width:0;">
+      <div style="font-size:.9rem;">{{ (g.primary or g.secondary).name }}</div>
+      <div class="meta" style="overflow-wrap:anywhere;">{{ (g.primary or g.secondary).location or "No location" }}</div>
+    </div>
+    <div>
+      {% if g.status == "ok" %}<span class="badge badge-ok">Match</span>
+      {% elif g.status == "missing_primary" %}<span class="badge badge-missing">Not on {{ pri }}</span>
+      {% elif g.status == "missing_secondary" %}<span class="badge badge-missing">Not on {{ sec }}</span>
+      {% elif g.status == "time_mismatch" %}<span class="badge badge-mismatch">Time</span>
+      {% elif g.status == "location_mismatch" %}<span class="badge badge-mismatch">Location</span>
+      {% elif g.status == "tbd" %}<span class="badge badge-error">TBD</span>
+      {% elif g.status == "cancelled" %}<span class="badge badge-missing">Cancelled</span>
+      {% endif %}
+    </div>
+  </div>
+  {% endfor %}
+    </div>
+  </details>
+</div>
+{% endif %}
 
 {% if latest.summary %}
 <div class="card">
-  <h2>Feed Contents</h2>
+  <h2>Feed contents</h2>
   <table>
     <thead><tr><th>Feed</th><th>Games</th><th>Practices</th></tr></thead>
     <tbody>
-      <tr>
-        <td>{{ latest.primary_label or config.calendars.primary.label }}</td>
-        <td>{{ latest.summary.primary_games }}</td>
-        <td>{{ latest.summary.primary_practices }}</td>
-      </tr>
-      <tr>
-        <td>{{ latest.secondary_label or config.calendars.secondary.label }}</td>
-        <td>{{ latest.summary.secondary_games }}</td>
-        <td>{{ latest.summary.secondary_practices }}</td>
-      </tr>
+      <tr><td>{{ pri }}</td><td>{{ latest.summary.primary_games }}</td><td>{{ latest.summary.primary_practices }}</td></tr>
+      <tr><td>{{ sec }}</td><td>{{ latest.summary.secondary_games }}</td><td>{{ latest.summary.secondary_practices }}</td></tr>
     </tbody>
   </table>
   {% if latest.summary.last_game %}
-    <p class="meta" style="margin-bottom:0;">Last scheduled game: {{ latest.summary.last_game }}</p>
+    <p class="meta" style="margin-top:.6rem;">Last scheduled game: {{ latest.summary.last_game }}</p>
   {% endif %}
 </div>
 {% endif %}
 
-{% if latest.games %}
+{% if history %}
 <div class="card">
-  <h2>Upcoming Games</h2>
-  <table>
-    <thead>
-      <tr>
-        <th>Date</th>
-        <th>Time</th>
-        <th>{{ latest.primary_label or config.calendars.primary.label }}</th>
-        <th>{{ latest.secondary_label or config.calendars.secondary.label }}</th>
-        <th>Status</th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for game in latest.games %}
-      <tr>
-        <td>{{ game.date }}</td>
-        <td>{{ game.time }}</td>
-        <td>
-          {% if game.primary %}
-            <div>{{ game.primary.name }}</div>
-            <div class="meta">{{ game.primary.time }} · {{ game.primary.location or "No location" }}</div>
-          {% else %}
-            <span class="meta">—</span>
-          {% endif %}
-        </td>
-        <td>
-          {% if game.secondary %}
-            <div>{{ game.secondary.name }}</div>
-            <div class="meta">{{ game.secondary.time }} · {{ game.secondary.location or "No location" }}</div>
-          {% else %}
-            <span class="meta">—</span>
-          {% endif %}
-        </td>
-        <td>
-          {% if game.status == "ok" %}
-            <span class="badge badge-ok">Match</span>
-          {% elif game.status == "location_mismatch" %}
-            <span class="badge badge-mismatch">Location Mismatch</span>
-          {% elif game.status == "missing_secondary" %}
-            <span class="badge badge-missing">Missing from {{ latest.secondary_label or config.calendars.secondary.label }}</span>
-          {% elif game.status == "missing_primary" %}
-            <span class="badge badge-missing">Missing from {{ latest.primary_label or config.calendars.primary.label }}</span>
-          {% elif game.status == "time_mismatch" %}
-            <span class="badge badge-mismatch">Time Mismatch</span>
-          {% elif game.status == "tbd" %}
-            <span class="badge badge-issues">TBD</span>
-          {% elif game.status == "cancelled" %}
-            <span class="badge badge-missing">Cancelled</span>
-          {% endif %}
-        </td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
+  <details>
+    <summary>Daily check history ({{ history | length }})</summary>
+    <table style="margin-top:.85rem;">
+      <thead><tr><th>When</th><th>Result</th><th>Games</th></tr></thead>
+      <tbody>
+        {% for entry in history %}
+        <tr>
+          <td>{{ entry.timestamp | replace("T", " ") | truncate(16, True, "") }}</td>
+          <td>
+            {% if entry.status == "ok" %}<span class="badge badge-ok">All clear</span>
+            {% elif entry.status == "issues" %}<span class="badge badge-issues">Issues</span>
+            {% elif entry.status == "one_sided" %}<span class="badge badge-error">One feed only</span>
+            {% elif entry.status == "no_games" %}<span class="badge badge-error">No games</span>
+            {% else %}<span class="badge badge-error">Error</span>{% endif %}
+          </td>
+          <td>{{ entry.games | length }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </details>
 </div>
 {% endif %}
 
-{% else %}
-<div class="card">
-  <p style="color:#888;">No checks have been run yet. Click <strong>Run Check Now</strong> to get started.</p>
-</div>
-{% endif %}
+<form method="post" action="/run" style="margin-top:.25rem;">
+  <button class="btn btn-secondary" type="submit">Run full check &amp; email me</button>
+</form>
 
-{% if history | length > 1 %}
-<div class="card">
-  <h2>Recent History</h2>
-  <table>
-    <thead>
-      <tr>
-        <th>Timestamp</th>
-        <th>Status</th>
-        <th>Games</th>
-        <th>Issues</th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for entry in history %}
-      <tr>
-        <td>{{ entry.timestamp | replace("T"," ") | truncate(16, False, "") }}</td>
-        <td>
-          {% if entry.status == "ok" %}
-            <span class="badge badge-ok">All Clear</span>
-          {% elif entry.status == "issues" %}
-            <span class="badge badge-issues">Issues</span>
-          {% elif entry.status == "one_sided" %}
-            <span class="badge badge-issues">One Feed Only</span>
-          {% elif entry.status == "no_games" %}
-            <span class="badge badge-issues">No Games</span>
-          {% else %}
-            <span class="badge badge-error">Error</span>
-          {% endif %}
-        </td>
-        <td>{{ entry.games | length }}</td>
-        <td>{{ entry.games | selectattr("status", "ne", "ok") | list | length }}</td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
-</div>
 {% endif %}
 {% endblock %}

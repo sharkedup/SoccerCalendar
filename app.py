@@ -4,6 +4,8 @@ Soccer Calendar Checker — web app + scheduler.
 Run this once; it handles its own daily schedule and serves the dashboard.
 """
 
+from __future__ import annotations
+
 import json
 import logging
 import threading
@@ -27,13 +29,52 @@ log = logging.getLogger(__name__)
 
 # ── History ───────────────────────────────────────────────────────────────────
 HISTORY_PATH  = Path(__file__).parent / "history.json"
+LATEST_PATH   = Path(__file__).parent / "latest.json"
 MAX_HISTORY   = 30
+
+# How stale the cached result may be before loading the dashboard re-checks.
+FRESH_FOR_MINUTES = 15
+
+_refresh_lock = threading.Lock()
 
 
 def load_history() -> list:
     if HISTORY_PATH.exists():
         return json.loads(HISTORY_PATH.read_text())
     return []
+
+
+def load_latest() -> dict | None:
+    if LATEST_PATH.exists():
+        try:
+            return json.loads(LATEST_PATH.read_text())
+        except json.JSONDecodeError:
+            return None
+    return None
+
+
+def save_latest(result: dict):
+    LATEST_PATH.write_text(json.dumps(result, indent=2))
+
+
+def refresh_latest(max_age_minutes: int = 0) -> dict:
+    """Re-run the comparison for the dashboard. No email, no history entry.
+
+    History stays a record of the scheduled daily runs; on-demand page loads
+    would otherwise churn through it.
+    """
+    with _refresh_lock:
+        latest = load_latest()
+        if latest and max_age_minutes:
+            try:
+                age = datetime.now() - datetime.fromisoformat(latest["timestamp"])
+                if age.total_seconds() < max_age_minutes * 60:
+                    return latest
+            except (ValueError, KeyError):
+                pass
+        result = run_check(load_config())
+        save_latest(result)
+        return result
 
 
 def save_history(entry: dict):
@@ -48,6 +89,7 @@ def scheduled_check():
     log.info("Running scheduled calendar check…")
     result = run_check(config)
     save_history(result)
+    save_latest(result)
 
     email_cfg = config["email"]
     if email_cfg.get("gmail_app_password") and email_cfg.get("address"):
@@ -95,17 +137,24 @@ app.secret_key = "soccer-calendar-checker-secret"
 
 @app.route("/")
 def index():
+    latest  = refresh_latest(max_age_minutes=FRESH_FOR_MINUTES) or (load_history() or [None])[0]
     history = load_history()
-    latest  = history[0] if history else None
     config  = load_config()
     return render_template("index.html", latest=latest, history=history, config=config)
+
+
+@app.route("/refresh", methods=["POST"])
+def manual_refresh():
+    refresh_latest()
+    flash("Refreshed from the calendar feeds.", "success")
+    return redirect(url_for("index"))
 
 
 @app.route("/run", methods=["POST"])
 def manual_run():
     log.info("Manual check triggered from web UI.")
     scheduled_check()
-    flash("Check complete.", "success")
+    flash("Check complete — email sent.", "success")
     return redirect(url_for("index"))
 
 

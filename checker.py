@@ -147,8 +147,10 @@ def get_events(url: str, months_ahead: int = 6) -> dict:
         games.append(event)
 
     games.sort(key=lambda e: e["start"])
+    practices.sort(key=lambda e: e["start"])
     return {
         "games": games,
+        "practices": practices,
         "practice_count": len(practices),
         "recurring_skipped": len(recurring),
     }
@@ -288,6 +290,43 @@ def compare_games(primary: list[dict], secondary: list[dict]) -> list[dict]:
     return rows
 
 
+def _next_practice(feeds: dict, labels: dict) -> dict | None:
+    now = datetime.now()
+    upcoming = []
+    for which, feed in feeds.items():
+        for event in feed["practices"]:
+            if event["start"] >= now:
+                upcoming.append((event, labels[which]))
+    if not upcoming:
+        return None
+    event, label = min(upcoming, key=lambda pair: pair[0]["start"])
+    return {
+        "date": event["start"].date().isoformat(),
+        "time": event["start"].strftime("%H:%M"),
+        "name": event["name"],
+        "location": event["location"],
+        "feed": label,
+    }
+
+
+def _next_game(rows: list[dict]) -> dict | None:
+    """First compared game still ahead of us, with its match status."""
+    now = datetime.now()
+    for row in rows:
+        when = datetime.strptime(f"{row['date']} {row['time']}", "%Y-%m-%d %H:%M")
+        if when < now or row["status"] == "cancelled":
+            continue
+        shown = row["primary"] or row["secondary"]
+        return {
+            "date": row["date"],
+            "time": row["time"],
+            "name": shown["name"],
+            "location": shown["location"],
+            "status": row["status"],
+        }
+    return None
+
+
 def _feed(config: dict, which: str) -> tuple[str, str]:
     """Return (label, url) for a configured feed."""
     entry = config["calendars"][which]
@@ -323,6 +362,9 @@ def run_check(config: dict) -> dict:
     pri_games = feeds["primary"]["games"]
     sec_games = feeds["secondary"]["games"]
 
+    labels = {"primary": pri_label, "secondary": sec_label}
+    result["next_practice"] = _next_practice(feeds, labels)
+
     result["summary"] = {
         "primary_games": len(pri_games),
         "secondary_games": len(sec_games),
@@ -337,22 +379,24 @@ def run_check(config: dict) -> dict:
     # produced three weeks of "all games match" over an empty dataset, and one
     # side having published no games yet is not the same as N missing games.
     if not pri_games and not sec_games:
-        result.update(status="no_games", games=[])
+        result.update(status="no_games", games=[], next_game=None)
         return result
     if not pri_games or not sec_games:
         empty = pri_label if not pri_games else sec_label
         other = sec_label if not pri_games else pri_label
         count = len(sec_games) if not pri_games else len(pri_games)
+        rows = compare_games(pri_games, sec_games)
         result.update(
             status="one_sided",
             error=f"No games published on '{empty}' yet — '{other}' has {count}.",
-            games=compare_games(pri_games, sec_games),
+            games=rows,
+            next_game=_next_game(rows),
         )
         return result
 
     games = compare_games(pri_games, sec_games)
     issues = [g for g in games if g["status"] not in ("ok", "cancelled")]
-    result.update(status="issues" if issues else "ok", games=games)
+    result.update(status="issues" if issues else "ok", games=games, next_game=_next_game(games))
     return result
 
 

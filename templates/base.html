@@ -2,58 +2,90 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Soccer">
+  <meta name="theme-color" content="#1d1d1f">
   <title>Soccer Calendar Checker</title>
   <style>
+    :root {
+      --bg: #f5f5f7; --surface: #fff; --text: #1d1d1f; --text-dim: #6b6b70;
+      --line: #e5e5e7; --line-soft: #f0f0f2; --nav: #1d1d1f; --nav-text: #f5f5f7;
+      --accent: #0071e3; --shadow: 0 1px 4px rgba(0,0,0,.08);
+      --ok-bg: #d1fae5; --ok-text: #065f46;
+      --bad-bg: #fee2e2; --bad-text: #991b1b;
+      --warn-bg: #fef3c7; --warn-text: #92400e;
+      --safe-top: env(safe-area-inset-top, 0px);
+      --safe-bottom: env(safe-area-inset-bottom, 0px);
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #000; --surface: #1c1c1e; --text: #f5f5f7; --text-dim: #9a9aa0;
+        --line: #38383a; --line-soft: #2c2c2e; --nav: #1c1c1e; --nav-text: #f5f5f7;
+        --accent: #0a84ff; --shadow: none;
+        --ok-bg: #0b3b2c; --ok-text: #6ee7b7;
+        --bad-bg: #4a1113; --bad-text: #fca5a5;
+        --warn-bg: #45320a; --warn-text: #fcd34d;
+      }
+    }
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-           background: #f5f5f7; color: #1d1d1f; min-height: 100vh; }
-    nav  { background: #1d1d1f; padding: 0 2rem; display: flex; align-items: center;
-           gap: 2rem; height: 52px; }
-    nav a { color: #f5f5f7; text-decoration: none; font-size: .9rem; opacity: .8; }
+           background: var(--bg); color: var(--text); min-height: 100vh;
+           -webkit-text-size-adjust: 100%; }
+    nav  { background: var(--nav); display: flex; align-items: center; gap: 1.25rem;
+           padding: calc(.75rem + var(--safe-top)) 1.25rem .75rem; position: sticky; top: 0; z-index: 10; }
+    nav a { color: var(--nav-text); text-decoration: none; font-size: .9rem; opacity: .75; }
     nav a:first-child { font-weight: 600; font-size: 1rem; opacity: 1; flex: 1; }
     nav a:hover { opacity: 1; }
-    .container { max-width: 960px; margin: 0 auto; padding: 2rem 1.5rem; }
-    h1  { font-size: 1.6rem; font-weight: 600; margin-bottom: 1.5rem; }
-    h2  { font-size: 1.1rem; font-weight: 600; margin-bottom: 1rem; color: #444; }
-    .card { background: #fff; border-radius: 12px; padding: 1.5rem;
-            box-shadow: 0 1px 4px rgba(0,0,0,.08); margin-bottom: 1.5rem; }
-    .badge { display: inline-block; padding: .25rem .65rem; border-radius: 20px;
-             font-size: .8rem; font-weight: 600; }
-    .badge-ok      { background: #d1fae5; color: #065f46; }
-    .badge-issues  { background: #fee2e2; color: #991b1b; }
-    .badge-error   { background: #fef3c7; color: #92400e; }
-    .badge-mismatch    { background: #fee2e2; color: #991b1b; }
-    .badge-missing     { background: #fef3c7; color: #92400e; }
+    .container { max-width: 900px; margin: 0 auto;
+                 padding: 1.25rem 1rem calc(2rem + var(--safe-bottom)); }
+    h1 { font-size: 1.5rem; font-weight: 650; letter-spacing: -.02em; }
+    h2 { font-size: .8rem; font-weight: 650; margin-bottom: .75rem; color: var(--text-dim);
+         text-transform: uppercase; letter-spacing: .06em; }
+    .card { background: var(--surface); border-radius: 14px; padding: 1.1rem;
+            box-shadow: var(--shadow); margin-bottom: 1rem; }
+    .badge { display: inline-block; padding: .25rem .6rem; border-radius: 20px;
+             font-size: .75rem; font-weight: 650; white-space: nowrap; }
+    .badge-ok       { background: var(--ok-bg);   color: var(--ok-text); }
+    .badge-issues   { background: var(--bad-bg);  color: var(--bad-text); }
+    .badge-error    { background: var(--warn-bg); color: var(--warn-text); }
+    .badge-mismatch { background: var(--bad-bg);  color: var(--bad-text); }
+    .badge-missing  { background: var(--warn-bg); color: var(--warn-text); }
     table { width: 100%; border-collapse: collapse; font-size: .9rem; }
-    th    { text-align: left; padding: .6rem .75rem; border-bottom: 2px solid #e5e5e5;
-            font-weight: 600; color: #555; font-size: .8rem; text-transform: uppercase;
-            letter-spacing: .05em; }
-    td    { padding: .6rem .75rem; border-bottom: 1px solid #f0f0f0; vertical-align: top; }
+    th { text-align: left; padding: .5rem .6rem; border-bottom: 2px solid var(--line);
+         font-weight: 650; color: var(--text-dim); font-size: .72rem;
+         text-transform: uppercase; letter-spacing: .05em; }
+    td { padding: .55rem .6rem; border-bottom: 1px solid var(--line-soft); vertical-align: top; }
     tr:last-child td { border-bottom: none; }
-    tr:hover td { background: #fafafa; }
-    .btn { display: inline-block; padding: .5rem 1.2rem; border-radius: 8px; border: none;
-           cursor: pointer; font-size: .9rem; font-weight: 500; text-decoration: none; }
-    .btn-primary { background: #0071e3; color: #fff; }
-    .btn-primary:hover { background: #0077ed; }
-    .btn-secondary { background: #e5e5e5; color: #1d1d1f; }
-    .btn-secondary:hover { background: #d5d5d5; }
-    .flash { padding: .75rem 1rem; border-radius: 8px; margin-bottom: 1.5rem;
-             background: #d1fae5; color: #065f46; font-size: .9rem; }
-    .meta  { font-size: .8rem; color: #888; }
-    label  { display: block; font-size: .9rem; font-weight: 500; margin-bottom: .35rem; color: #333; }
-    input[type=text], input[type=email], input[type=password], input[type=time], select {
-      width: 100%; padding: .5rem .75rem; border: 1px solid #d5d5d5;
-      border-radius: 8px; font-size: .95rem; outline: none; }
-    input:focus { border-color: #0071e3; box-shadow: 0 0 0 3px rgba(0,113,227,.15); }
-    .form-row { margin-bottom: 1.2rem; }
-    .form-hint { font-size: .8rem; color: #888; margin-top: .3rem; }
-    .section-divider { border: none; border-top: 1px solid #e5e5e5; margin: 1.5rem 0; }
+    .btn { display: inline-block; padding: .6rem 1.1rem; border-radius: 10px; border: none;
+           cursor: pointer; font-size: .9rem; font-weight: 550; text-decoration: none;
+           font-family: inherit; }
+    .btn-primary   { background: var(--accent); color: #fff; }
+    .btn-secondary { background: var(--line); color: var(--text); }
+    .flash { padding: .7rem .9rem; border-radius: 10px; margin-bottom: 1rem;
+             background: var(--ok-bg); color: var(--ok-text); font-size: .875rem; }
+    .meta { font-size: .78rem; color: var(--text-dim); }
+    label { display: block; font-size: .9rem; font-weight: 550; margin-bottom: .35rem; }
+    input[type=text], input[type=email], input[type=password], input[type=time],
+    input[type=url], select {
+      width: 100%; padding: .6rem .75rem; border: 1px solid var(--line);
+      border-radius: 10px; font-size: 16px; outline: none;
+      background: var(--surface); color: var(--text); font-family: inherit; }
+    input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(0,113,227,.15); }
+    .form-row { margin-bottom: 1.1rem; }
+    .form-hint { font-size: .78rem; color: var(--text-dim); margin-top: .3rem;
+                 overflow-wrap: anywhere; }
+    a { color: var(--accent); }
+    @media (max-width: 640px) {
+      h1 { font-size: 1.3rem; }
+      .card { padding: .95rem; border-radius: 12px; }
+      .btn { width: 100%; text-align: center; }
+    }
   </style>
 </head>
 <body>
 <nav>
-  <a href="/">⚽ Soccer Calendar Checker</a>
+  <a href="/">⚽ Soccer Calendar</a>
   <a href="/">Dashboard</a>
   <a href="/config">Settings</a>
 </nav>
