@@ -5,15 +5,29 @@
 <form method="post" action="/config">
   <div class="card">
     <h2>Calendars</h2>
+    <p class="form-hint" style="margin-top:0;">
+      These are read directly from the published .ics feeds, not from Apple Calendar.
+      To find a feed URL: Calendar &rsaquo; right-click the calendar &rsaquo; Get Info &rsaquo; "Subscribed to".
+    </p>
     <div class="form-row">
-      <label>Primary Calendar</label>
-      <input type="text" name="primary_cal" value="{{ config.calendars.primary }}" required>
-      <p class="form-hint">The main team calendar (e.g. U13G Phoenix)</p>
+      <label>Primary Calendar Name</label>
+      <input type="text" name="primary_label" value="{{ config.calendars.primary.label }}" required>
+      <p class="form-hint">Display name only (e.g. U13G Phoenix — the club feed)</p>
     </div>
     <div class="form-row">
-      <label>Secondary Calendar</label>
-      <input type="text" name="secondary_cal" value="{{ config.calendars.secondary }}" required>
-      <p class="form-hint">The league or second calendar to match against (e.g. SPF Phoenix)</p>
+      <label>Primary Feed URL</label>
+      <input type="url" name="primary_url" value="{{ config.calendars.primary.url }}" required
+             placeholder="https://calendar.playmetrics.com/calendars/.../calendar.ics">
+    </div>
+    <div class="form-row">
+      <label>Secondary Calendar Name</label>
+      <input type="text" name="secondary_label" value="{{ config.calendars.secondary.label }}" required>
+      <p class="form-hint">The league feed to match against (e.g. SPF Phoenix - SYSL)</p>
+    </div>
+    <div class="form-row">
+      <label>Secondary Feed URL</label>
+      <input type="url" name="secondary_url" value="{{ config.calendars.secondary.url }}" required
+             placeholder="https://ical.sportngin.com/v3/calendar/ical?team_ids=...">
     </div>
   </div>
 

@@ -64,6 +64,20 @@ def scheduled_check():
     log.info(f"Check complete — status: {result['status']}")
 
 
+def startup_check():
+    """Check once on boot, unless today's scheduled run already happened."""
+    try:
+        history = load_history()
+        today = datetime.now().date().isoformat()
+        if any(e.get("timestamp", "").startswith(today) for e in history):
+            log.info("Startup check skipped — already ran today.")
+            return
+        log.info("Running startup calendar check…")
+        scheduled_check()
+    except Exception as e:
+        log.error(f"Startup check failed: {e}")
+
+
 def run_scheduler():
     config = load_config()
     check_time = config["schedule"].get("check_time", "07:00")
@@ -100,8 +114,14 @@ def config_page():
     config = load_config()
 
     if request.method == "POST":
-        config["calendars"]["primary"]          = request.form["primary_cal"].strip()
-        config["calendars"]["secondary"]        = request.form["secondary_cal"].strip()
+        config["calendars"]["primary"] = {
+            "label": request.form["primary_label"].strip(),
+            "url":   request.form["primary_url"].strip(),
+        }
+        config["calendars"]["secondary"] = {
+            "label": request.form["secondary_label"].strip(),
+            "url":   request.form["secondary_url"].strip(),
+        }
         config["email"]["address"]              = request.form["email_address"].strip()
         config["email"]["always_send"]          = "always_send" in request.form
         config["schedule"]["check_time"]        = request.form["check_time"].strip()
@@ -130,6 +150,10 @@ if __name__ == "__main__":
     # Start scheduler in background thread
     t = threading.Thread(target=run_scheduler, daemon=True)
     t.start()
+
+    # Run one check at startup so a restart past the scheduled time does not
+    # silently skip the day.
+    threading.Thread(target=startup_check, daemon=True).start()
 
     log.info(f"Starting web server on http://0.0.0.0:{port}")
     app.run(host="0.0.0.0", port=port, debug=False)

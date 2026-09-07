@@ -1,12 +1,13 @@
 # Soccer Calendar Checker
 
-Compares two Apple Calendar soccer calendars daily, flags mismatches, and sends email reports. Includes a web dashboard and settings UI.
+Compares two published soccer calendar feeds (.ics) daily, flags mismatches, and sends email reports. Includes a web dashboard and settings UI.
 
 ## What it does
 
-- Reads two Apple Calendars and matches upcoming game events
+- Reads two .ics feeds directly over HTTPS (club and league) and matches upcoming games
 - Ignores any event with "practice" in the title
-- Matches games by date and time, then checks that locations agree (street name + town)
+- Pairs games by date first, then compares kickoff time and location (street name + town)
+- Reports how many games each feed contains, so an empty feed can never read as "all clear"
 - Sends a daily email summary (all clear or list of issues)
 - Runs a web dashboard to view results and change settings without editing code
 - Runs continuously as a background process, auto-starts on login
@@ -19,7 +20,7 @@ Compares two Apple Calendar soccer calendars daily, flags mismatches, and sends 
 
 Make sure the Mac Mini has:
 - **Python 3** — check with `python3 --version`. If missing: `brew install python3`
-- **The two Apple Calendars synced** — log into iCloud in System Settings so both calendars appear in Calendar.app
+- **The two calendar feed URLs** — in Calendar.app, right-click each calendar › Get Info › copy the "Subscribed to" URL. The app reads these URLs directly; it does not use Apple Calendar, so no Calendar permission is needed.
 - **Auto-login enabled** — System Settings → Users & Groups → Automatically log in as (required for LaunchAgents to fire at boot)
 
 ### 2. Clone the repo
@@ -51,7 +52,7 @@ http://mac-mini.local:8080/config
 ```
 
 Fill in:
-- Calendar names (must match exactly as they appear in Calendar.app)
+- Calendar display names, and the .ics feed URL for each
 - Gmail address and App Password
 - Daily check time (default 7:00 AM)
 

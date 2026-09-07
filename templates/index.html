@@ -14,6 +14,10 @@
       <span class="badge badge-ok">All Clear</span>
     {% elif latest.status == "issues" %}
       <span class="badge badge-issues">Issues Found</span>
+    {% elif latest.status == "one_sided" %}
+      <span class="badge badge-issues">Games On One Feed Only</span>
+    {% elif latest.status == "no_games" %}
+      <span class="badge badge-issues">No Games — Nothing Compared</span>
     {% else %}
       <span class="badge badge-error">Error</span>
     {% endif %}
@@ -22,10 +26,15 @@
 
   {% if latest.status == "error" %}
     <p style="color:#991b1b; margin-top:.5rem;">{{ latest.error }}</p>
+  {% elif latest.status in ("one_sided", "no_games") %}
+    <p style="color:#92400e; margin-top:.5rem;">
+      {{ latest.error or "Neither feed has any games in the next 6 months." }}
+      This is <strong>not</strong> an all-clear — nothing was cross-checked.
+    </p>
   {% elif latest.status == "ok" %}
     <p style="color:#065f46; margin-top:.5rem;">
-      All upcoming games on <strong>{{ config.calendars.primary }}</strong> and
-      <strong>{{ config.calendars.secondary }}</strong> are consistent.
+      All upcoming games on <strong>{{ latest.primary_label or config.calendars.primary.label }}</strong> and
+      <strong>{{ latest.secondary_label or config.calendars.secondary.label }}</strong> are consistent.
     </p>
   {% else %}
     {% set issues = latest.games | selectattr("status", "ne", "ok") | list %}
@@ -35,6 +44,30 @@
   {% endif %}
 </div>
 
+{% if latest.summary %}
+<div class="card">
+  <h2>Feed Contents</h2>
+  <table>
+    <thead><tr><th>Feed</th><th>Games</th><th>Practices</th></tr></thead>
+    <tbody>
+      <tr>
+        <td>{{ latest.primary_label or config.calendars.primary.label }}</td>
+        <td>{{ latest.summary.primary_games }}</td>
+        <td>{{ latest.summary.primary_practices }}</td>
+      </tr>
+      <tr>
+        <td>{{ latest.secondary_label or config.calendars.secondary.label }}</td>
+        <td>{{ latest.summary.secondary_games }}</td>
+        <td>{{ latest.summary.secondary_practices }}</td>
+      </tr>
+    </tbody>
+  </table>
+  {% if latest.summary.last_game %}
+    <p class="meta" style="margin-bottom:0;">Last scheduled game: {{ latest.summary.last_game }}</p>
+  {% endif %}
+</div>
+{% endif %}
+
 {% if latest.games %}
 <div class="card">
   <h2>Upcoming Games</h2>
@@ -43,8 +76,8 @@
       <tr>
         <th>Date</th>
         <th>Time</th>
-        <th>{{ config.calendars.primary }}</th>
-        <th>{{ config.calendars.secondary }}</th>
+        <th>{{ latest.primary_label or config.calendars.primary.label }}</th>
+        <th>{{ latest.secondary_label or config.calendars.secondary.label }}</th>
         <th>Status</th>
       </tr>
     </thead>
@@ -56,7 +89,7 @@
         <td>
           {% if game.primary %}
             <div>{{ game.primary.name }}</div>
-            <div class="meta">{{ game.primary.location or "No location" }}</div>
+            <div class="meta">{{ game.primary.time }} · {{ game.primary.location or "No location" }}</div>
           {% else %}
             <span class="meta">—</span>
           {% endif %}
@@ -64,7 +97,7 @@
         <td>
           {% if game.secondary %}
             <div>{{ game.secondary.name }}</div>
-            <div class="meta">{{ game.secondary.location or "No location" }}</div>
+            <div class="meta">{{ game.secondary.time }} · {{ game.secondary.location or "No location" }}</div>
           {% else %}
             <span class="meta">—</span>
           {% endif %}
@@ -75,9 +108,15 @@
           {% elif game.status == "location_mismatch" %}
             <span class="badge badge-mismatch">Location Mismatch</span>
           {% elif game.status == "missing_secondary" %}
-            <span class="badge badge-missing">Missing from {{ config.calendars.secondary }}</span>
+            <span class="badge badge-missing">Missing from {{ latest.secondary_label or config.calendars.secondary.label }}</span>
           {% elif game.status == "missing_primary" %}
-            <span class="badge badge-missing">Missing from {{ config.calendars.primary }}</span>
+            <span class="badge badge-missing">Missing from {{ latest.primary_label or config.calendars.primary.label }}</span>
+          {% elif game.status == "time_mismatch" %}
+            <span class="badge badge-mismatch">Time Mismatch</span>
+          {% elif game.status == "tbd" %}
+            <span class="badge badge-issues">TBD</span>
+          {% elif game.status == "cancelled" %}
+            <span class="badge badge-missing">Cancelled</span>
           {% endif %}
         </td>
       </tr>
@@ -114,6 +153,10 @@
             <span class="badge badge-ok">All Clear</span>
           {% elif entry.status == "issues" %}
             <span class="badge badge-issues">Issues</span>
+          {% elif entry.status == "one_sided" %}
+            <span class="badge badge-issues">One Feed Only</span>
+          {% elif entry.status == "no_games" %}
+            <span class="badge badge-issues">No Games</span>
           {% else %}
             <span class="badge badge-error">Error</span>
           {% endif %}
