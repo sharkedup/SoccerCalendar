@@ -8,13 +8,15 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 import threading
-from datetime import datetime
+import urllib.parse
+from datetime import date, datetime
 from pathlib import Path
 
 import schedule
 import time
-from flask import Flask, render_template, request, redirect, url_for, flash
+from flask import Flask, render_template, request, redirect, send_from_directory, url_for, flash
 
 from config_manager import load_config, save_config
 from checker import run_check, send_email
@@ -135,12 +137,95 @@ app = Flask(__name__)
 app.secret_key = "soccer-calendar-checker-secret"
 
 
+# ── Template filters ──────────────────────────────────────────────────────────
+_MATCHUP = re.compile(r"\b(at|vs\.?|v)\b", re.IGNORECASE)
+
+
+def _as_date(value):
+    try:
+        return date.fromisoformat(str(value)[:10])
+    except ValueError:
+        return None
+
+
+@app.template_filter("pretty_date")
+def pretty_date(value) -> str:
+    d = _as_date(value)
+    if not d:
+        return value
+    return d.strftime("%a, %b %-d")
+
+
+@app.template_filter("pretty_time")
+def pretty_time(value) -> str:
+    """'15:30' → '3:30 PM'. Midnight is the feeds' stand-in for 'not set yet'."""
+    if not value or value == "00:00":
+        return "Time TBD"
+    try:
+        return datetime.strptime(value, "%H:%M").strftime("%-I:%M %p")
+    except ValueError:
+        return value
+
+
+@app.template_filter("relative_day")
+def relative_day(value) -> str:
+    d = _as_date(value)
+    if not d:
+        return ""
+    days = (d - datetime.now().date()).days
+    if days < 0:
+        return "past"
+    if days == 0:
+        return "today"
+    if days == 1:
+        return "tomorrow"
+    if days < 7:
+        return f"in {days} days"
+    weeks = round(days / 7)
+    return "in 1 week" if weeks == 1 else f"in {weeks} weeks"
+
+
+@app.template_filter("maps_url")
+def maps_url(location: str) -> str:
+    return "https://maps.apple.com/?q=" + urllib.parse.quote(location or "")
+
+
+@app.template_filter("game_title")
+def game_title(row: dict) -> str:
+    """The most descriptive name available for a game.
+
+    One feed labels every game 'SPF U13G Phoenix - Game' and puts the actual
+    matchup in the description; the other names the matchup directly. Prefer
+    whichever candidate reads as 'A at B'.
+    """
+    candidates = []
+    for side in ("primary", "secondary"):
+        event = row.get(side)
+        if not event:
+            continue
+        notes = event.get("notes") or []
+        if notes:
+            candidates.append(notes[0])
+        candidates.append(event.get("name", ""))
+    for candidate in candidates:
+        if _MATCHUP.search(candidate):
+            return candidate
+    return next((c for c in candidates if c), "Game")
+
+
 @app.route("/")
 def index():
     latest  = refresh_latest(max_age_minutes=FRESH_FOR_MINUTES) or (load_history() or [None])[0]
     history = load_history()
     config  = load_config()
     return render_template("index.html", latest=latest, history=history, config=config)
+
+
+@app.route("/favicon.ico")
+def favicon():
+    """Browsers ask for this by name regardless of the <link> tags."""
+    return send_from_directory(app.static_folder, "apple-touch-icon.png",
+                               mimetype="image/png")
 
 
 @app.route("/refresh", methods=["POST"])

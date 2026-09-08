@@ -31,15 +31,30 @@
   .next-when { font-size:1.15rem; font-weight:680; letter-spacing:-.01em; }
   .next-name { font-size:.92rem; margin:.3rem 0 .35rem; }
   .next-loc  { font-size:.82rem; color:var(--text-dim); overflow-wrap:anywhere; }
-  .sched-row { display:grid; grid-template-columns:8.5rem 1fr auto; gap:.75rem;
-               padding:.65rem .1rem; border-bottom:1px solid var(--line-soft); align-items:start; }
-  .sched-row:last-child { border-bottom:none; }
+  .game { padding:.9rem 0; border-bottom:1px solid var(--line-soft); }
+  .game:first-child { padding-top:.2rem; }
+  .game:last-child { border-bottom:none; padding-bottom:.1rem; }
+  .game-top { display:flex; flex-wrap:wrap; align-items:baseline; gap:.5rem; }
+  .game-date { font-size:.95rem; font-weight:680; letter-spacing:-.01em; }
+  .game-time { font-size:.9rem; font-weight:550; }
+  .game-rel  { font-size:.78rem; color:var(--text-dim); }
+  .game-top .badge { margin-left:auto; }
+  .game-title { font-size:.95rem; margin:.3rem 0 .2rem; }
+  .game-line { font-size:.82rem; color:var(--text-dim); overflow-wrap:anywhere;
+               display:flex; gap:.4rem; padding:.08rem 0; }
+  .game-line .ico { flex:none; width:1rem; text-align:center; opacity:.75; }
+  .game-feeds { margin-top:.5rem; border-left:2px solid var(--line);
+                padding-left:.65rem; display:grid; gap:.35rem; }
+  .feed-name { font-size:.72rem; text-transform:uppercase; letter-spacing:.05em;
+               font-weight:650; color:var(--text-dim); }
+  .feed-body { font-size:.82rem; overflow-wrap:anywhere; }
+  .feed-body .dim { color:var(--text-dim); }
+  .feed-missing { font-size:.82rem; color:var(--text-dim); font-style:italic; }
   details summary { cursor:pointer; font-size:.85rem; color:var(--text-dim); }
   @media (max-width: 640px) {
     .head { flex-direction:column; align-items:stretch; }
     .next-grid { grid-template-columns:1fr; gap:.7rem; }
-    .sched-row { grid-template-columns:1fr; gap:.2rem; }
-    .sched-row .badge { justify-self:start; margin-top:.2rem; }
+    .game-top .badge { margin-left:0; }
   }
 </style>
 
@@ -142,22 +157,69 @@
     <summary>All upcoming games ({{ latest.games | length }})</summary>
     <div style="margin-top:.75rem;">
   {% for g in latest.games %}
-  <div class="sched-row">
-    <div><strong style="font-size:.9rem;">{{ g.date }}</strong>
-         <div class="meta">{% if g.time != "00:00" %}{{ g.time }}{% else %}time TBD{% endif %}</div></div>
-    <div style="min-width:0;">
-      <div style="font-size:.9rem;">{{ (g.primary or g.secondary).name }}</div>
-      <div class="meta" style="overflow-wrap:anywhere;">{{ (g.primary or g.secondary).location or "No location" }}</div>
-    </div>
-    <div>
+  <div class="game">
+    <div class="game-top">
+      <span class="game-date">{{ g.date | pretty_date }}</span>
+      <span class="game-time">{{ g.time | pretty_time }}</span>
+      <span class="game-rel">{{ g.date | relative_day }}</span>
       {% if g.status == "ok" %}<span class="badge badge-ok">Match</span>
       {% elif g.status == "missing_primary" %}<span class="badge badge-missing">Not on {{ pri }}</span>
       {% elif g.status == "missing_secondary" %}<span class="badge badge-missing">Not on {{ sec }}</span>
-      {% elif g.status == "time_mismatch" %}<span class="badge badge-mismatch">Time</span>
-      {% elif g.status == "location_mismatch" %}<span class="badge badge-mismatch">Location</span>
+      {% elif g.status == "time_mismatch" %}<span class="badge badge-mismatch">Times disagree</span>
+      {% elif g.status == "location_mismatch" %}<span class="badge badge-mismatch">Locations disagree</span>
       {% elif g.status == "tbd" %}<span class="badge badge-error">TBD</span>
       {% elif g.status == "cancelled" %}<span class="badge badge-missing">Cancelled</span>
       {% endif %}
+    </div>
+
+    {% set title = g | game_title %}
+    <div class="game-title">{{ title }}</div>
+
+    {% set shown = g.primary or g.secondary %}
+    <div class="game-line"><span class="ico">📍</span>
+      {% if shown.location and shown.location | upper != "TBD" %}
+        <span><a href="{{ shown.location | maps_url }}" target="_blank" rel="noopener">{{ shown.location }}</a></span>
+      {% else %}
+        <span>Location TBD</span>
+      {% endif %}
+    </div>
+
+    {% if shown.end_time %}
+      <div class="game-line"><span class="ico">🕒</span>
+        <span>{{ shown.time | pretty_time }} – {{ shown.end_time | pretty_time }}</span>
+      </div>
+    {% endif %}
+
+    {% for note in (shown.notes or []) %}
+      {% if note != title %}
+        {% set low = note | lower %}
+        <div class="game-line">
+          <span class="ico">
+            {%- if low.startswith("arrive") %}⏰
+            {%- elif "uniform" in low or "wear" in low %}👕
+            {%- else %}📝{% endif -%}
+          </span>
+          <span>{{ note }}</span>
+        </div>
+      {% endif %}
+    {% endfor %}
+
+    <div class="game-feeds">
+      {% for label, ev in [(pri, g.primary), (sec, g.secondary)] %}
+        <div>
+          <div class="feed-name">{{ label }}</div>
+          {% if ev %}
+            <div class="feed-body">
+              {{ ev.time | pretty_time }}{% if ev.end_time %}–{{ ev.end_time | pretty_time }}{% endif %}
+              · {{ ev.name }}
+              <div class="dim">{{ ev.location or "No location" }}</div>
+              {% if ev.link %}<a href="{{ ev.link }}" target="_blank" rel="noopener">Open in feed ↗</a>{% endif %}
+            </div>
+          {% else %}
+            <div class="feed-missing">Not on this calendar</div>
+          {% endif %}
+        </div>
+      {% endfor %}
     </div>
   </div>
   {% endfor %}

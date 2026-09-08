@@ -89,8 +89,9 @@ def parse_ics(text: str) -> list[dict]:
             continue
 
         if line == "BEGIN:VEVENT":
-            current = {"name": "", "location": "", "start": None, "all_day": False,
-                       "recurring": False, "uid": ""}
+            current = {"name": "", "location": "", "start": None, "end": None,
+                       "all_day": False, "recurring": False, "uid": "",
+                       "description": "", "url": ""}
             continue
         if line == "END:VEVENT":
             if current and current["start"] is not None:
@@ -112,6 +113,10 @@ def parse_ics(text: str) -> list[dict]:
             current["name"] = _unescape(value)
         elif prop == "LOCATION":
             current["location"] = _unescape(value)
+        elif prop == "DESCRIPTION":
+            current["description"] = _unescape(value)
+        elif prop == "URL":
+            current["url"] = value.strip()
         elif prop == "UID":
             current["uid"] = value.strip()
         elif prop == "RRULE":
@@ -121,6 +126,11 @@ def parse_ics(text: str) -> list[dict]:
                 current["start"], current["all_day"] = _parse_dt(value, params)
             except ValueError:
                 current["start"] = None
+        elif prop == "DTEND":
+            try:
+                current["end"], _ = _parse_dt(value, params)
+            except ValueError:
+                current["end"] = None
 
     return events
 
@@ -234,13 +244,36 @@ def _row(day, pri: dict | None, sec: dict | None) -> dict:
     }
 
 
+def _split_description(text: str) -> tuple[list[str], str]:
+    """Split a DESCRIPTION into readable note lines and a first bare link.
+
+    SportsEngine puts only a deep link in DESCRIPTION; PlayMetrics puts the
+    matchup, an arrival time and the field name there.
+    """
+    notes, link = [], ""
+    for line in (text or "").splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        if line.lower().startswith(("http://", "https://")):
+            link = link or line
+        else:
+            notes.append(line)
+    return notes, link
+
+
 def _event_dict(event: dict | None) -> dict | None:
     if event is None:
         return None
+    notes, desc_link = _split_description(event.get("description", ""))
+    end = event.get("end")
     return {
         "name": event["name"],
         "location": event["location"],
         "time": event["start"].strftime("%H:%M"),
+        "end_time": end.strftime("%H:%M") if end and end != event["start"] else "",
+        "notes": notes,
+        "link": event.get("url") or desc_link,
     }
 
 
