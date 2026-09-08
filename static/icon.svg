@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 180 180" width="180" height="180">
+  <title>Soccer Calendar</title>
+  <rect width="180" height="180" fill="#1d1d1f"/>
+  <circle cx="90" cy="90" r="58" fill="#fff"/>
+  <polygon points="90.0,64.0 114.7,82.0 105.3,111.0 74.7,111.0 65.3,82.0" fill="#1d1d1f"/>
+  <g stroke="#1d1d1f" stroke-width="8" stroke-linecap="round">
+    <line x1="90.0" y1="64.0" x2="90.0" y2="32.0"/>
+    <line x1="114.7" y1="82.0" x2="145.2" y2="72.1"/>
+    <line x1="105.3" y1="111.0" x2="124.1" y2="136.9"/>
+    <line x1="74.7" y1="111.0" x2="55.9" y2="136.9"/>
+    <line x1="65.3" y1="82.0" x2="34.8" y2="72.1"/>
+  </g>
+</svg>
