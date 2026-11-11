@@ -289,5 +289,5 @@ if __name__ == "__main__":
     # silently skip the day.
     threading.Thread(target=startup_check, daemon=True).start()
 
-    log.info(f"Starting web server on http://0.0.0.0:{port}")
-    app.run(host="0.0.0.0", port=port, debug=False)
+    log.info(f"Starting web server on http://127.0.0.1:{port}")
+    app.run(host="127.0.0.1", port=port, debug=False)

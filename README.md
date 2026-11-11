@@ -45,11 +45,14 @@ This will:
 
 ### 4. Configure
 
-Open the dashboard in a browser (from your MacBook, replace `mac-mini.local` with your Mac Mini's hostname or IP):
+Open the dashboard in a browser. The app listens on 127.0.0.1 only, so from another device
+go through Tailscale (`tailscale serve` forwards port 8443 to it):
 
 ```
-http://mac-mini.local:8080/config
+https://kevins-mac-mini.tail0ceef7.ts.net:8443/config
 ```
+
+On the Mac Mini itself: http://localhost:8080/config
 
 Fill in:
 - Calendar display names, and the .ics feed URL for each
@@ -61,20 +64,19 @@ Fill in:
 Click **Run Check Now** on the dashboard, or visit:
 
 ```
-http://mac-mini.local:8080
+https://kevins-mac-mini.tail0ceef7.ts.net:8443
 ```
 
 ---
 
 ## Finding your Mac Mini's address
 
-On the Mac Mini, run:
+The dashboard is not reachable on the home network (LAN IP or `.local`), only via Tailscale.
+On the Mac Mini, this shows the Tailscale URL and which port maps to the app:
 
 ```bash
-hostname
+/Applications/Tailscale.app/Contents/MacOS/Tailscale serve status
 ```
-
-Or check System Settings → General → Sharing — the local hostname is shown there (e.g. `kevins-mac-mini.local`).
 
 ---
 
